@@ -1,25 +1,26 @@
 #include "application.h"
+#include "TimeAlarms.h"
 
 bool isDST(int dayOfMonth, int month, int dayOfWeek, String location);
 
 const int ONE_DAY_MILLIS = 24 * 60 * 60 * 1000;
 unsigned long lastSync = millis();
 int timeZone = -8; //UTC time zone TODO: Must be set/recieved from web/cloud
-String DSTRegion = "US"; //Location for checking DST - US (ignores exceptions), EU, and OFF TODO: Must be set/recieved from web/cloud, more DST support
+String DSTRule = "US"; //DST Rule - US, EU, and OFF TODO: Must be set/recieved from web/cloud, more DST support
 int DSTJumpHour; //When DST takes effect
 
 void setup() {
-  //Set the DSTJumpHour according to the DSTRegion
-  if(DSTRegion == "US") {
+  //Set the DSTJumpHour according to the DSTRule
+  if(DSTRule == "US") {
     DSTJumpHour = 2;
-  } else if(DSTRegion == "EU") {
+  } else if(DSTRule == "EU") {
     DSTJumpHour = 1+timeZone;
   } else {
     DSTJumpHour = 0;
   }
 
   //Set the proper time zone
-  Time.zone(isDST(Time.day(), Time.month(), Time.weekday(), DSTRegion) ? timeZone+1 : timeZone);
+  Time.zone(isDST(Time.day(), Time.month(), Time.weekday(), DSTRule) ? timeZone+1 : timeZone);
 }
 
 void loop() {
@@ -31,8 +32,11 @@ void loop() {
 
   //Update time zone at DSTJumpHour incase DST is now in effect
   if(Time.hour() == DSTJumpHour && Time.minute() == 0) {
-    Time.zone(isDST(Time.day(), Time.month(), Time.weekday(), DSTRegion) ? timeZone+1 : timeZone);
+    Time.zone(isDST(Time.day(), Time.month(), Time.weekday(), DSTRule) ? timeZone+1 : timeZone);
   }
+
+  //Delay for checking alarms/timers
+  Alarm.delay(1000);
 }
 
 //Return true if DST is currently observed
