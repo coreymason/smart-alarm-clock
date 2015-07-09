@@ -3,20 +3,19 @@
 #include "Adafruit_LEDBackpack.h"
 #include "Adafruit_GFX.h"
 
-bool isDST(int dayOfMonth, int month, int dayOfWeek, String location);
+bool isDST(int dayOfMonth, int month, int dayOfWeek, String rule);
 void refreshDisplayTime();
 
 Adafruit_7segment display = Adafruit_7segment();
 
 const int ONE_DAY_MILLIS = 24 * 60 * 60 * 1000;
 unsigned long lastSync = millis();
-int timeZone = -8; //UTC time zone TODO: Must be set/recieved from web/cloud
-String DSTRule = "US"; //DST Rule - US, EU, and OFF TODO: Must be set/recieved from web/cloud
+int timeZone = -8; //UTC time zone offset TODO: Must be set/recieved from web/cloud
+String DSTRule = "US"; //US, EU, or OFF TODO: Must be set/recieved from web/cloud
 int DSTJumpHour; //When DST takes effect
 bool hourFormat = "12" //12 or 24 TODO: Must be set/recieved from web/cloud
 
 void setup() {
-  //Set the DSTJumpHour according to the DSTRule
   if(DSTRule == "US") {
     DSTJumpHour = 2;
   } else if(DSTRule == "EU") {
@@ -45,7 +44,6 @@ void loop() {
     Time.zone(isDST(Time.day(), Time.month(), Time.weekday(), DSTRule) ? timeZone+1 : timeZone);
   }
 
-  //Update the 7-segment display
   refreshDisplayTime();
 
   //Delay for checking alarms/timers
@@ -53,46 +51,51 @@ void loop() {
 }
 
 //Return true if DST is currently observed
-bool isDST(int dayOfMonth, int month, int dayOfWeek, String location) {
-  if(location == "US") {
+bool isDST(int dayOfMonth, int month, int dayOfWeek, String rule) {
+  if(rule == "US") {
     //Month quick check
-    if (month < 3 || month > 11)
+    if (month < 3 || month > 11) {
       return false;
-    else if (month > 3 && month < 11)
+    } else if (month > 3 && month < 11) {
       return true;
+    }
     //The US observes DST from the first Sunday of March
     //The US observes DST until the first Sunday of November
     int previousSunday = dayOfMonth - dayOfWeek + 1;
-    if (month == 3)
+    if (month == 3) {
       return previousSunday >= 1;
-    else
+    } else {
       return previousSunday <= 0;
-  } else if(location == "EU") {
+    }
+  } else if(rule == "EU") {
     //Month quick check
-    if (month < 3 || month > 10)
+    if (month < 3 || month > 10) {
       return false;
-    else if (month > 3 && month < 10)
+    } else if (month > 3 && month < 10) {
       return true;
+    }
     //The EU observes DST from the last Sunday of March
     //The EU observes DST until the last Sunday of November
     int previousSunday = dayOfMonth - dayOfWeek + 1;
     if(month == 3) {
-      if(previousSunday+7>31)
+      if(previousSunday+7>31) {
         return true;
-      else
+      } else {
         return false;
+      }
     } else {
-      if(previousSunday+7>31)
+      if(previousSunday+7>31) {
         return false;
-      else
+      } else {
         return true;
+      }
     }
   } else {
     return false;
   }
 }
 
-//display the current time on the 7-segment display TODO: Allow both 12 and 24 hour formats
+//display the current time on the 7-segment display
 void refreshDisplayTime() {
   int currentTime = Time.now();
   if(hourFormat == "12") {
@@ -101,6 +104,7 @@ void refreshDisplayTime() {
     int hour = Time.hour(currentTime);
   }
   int minute = Time.minute(currentTime);
+
   display.drawColon(true);
   if(hour/10 != 0) {
     display.writeDigitNum(0, hour/10);
