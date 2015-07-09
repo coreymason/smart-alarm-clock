@@ -1,12 +1,14 @@
 #include "application.h"
 #include "TimeAlarms.h"
+#include "Adafruit_LEDBackpack.h"
+#include "Adafruit_GFX.h"
 
 bool isDST(int dayOfMonth, int month, int dayOfWeek, String location);
 
 const int ONE_DAY_MILLIS = 24 * 60 * 60 * 1000;
 unsigned long lastSync = millis();
 int timeZone = -8; //UTC time zone TODO: Must be set/recieved from web/cloud
-String DSTRule = "US"; //DST Rule - US, EU, and OFF TODO: Must be set/recieved from web/cloud, more DST support
+String DSTRule = "US"; //DST Rule - US, EU, and OFF TODO: Must be set/recieved from web/cloud
 int DSTJumpHour; //When DST takes effect
 
 void setup() {
@@ -36,7 +38,7 @@ void loop() {
   }
 
   //Delay for checking alarms/timers
-  Alarm.delay(1000);
+  Alarm.delay(500);
 }
 
 //Return true if DST is currently observed
