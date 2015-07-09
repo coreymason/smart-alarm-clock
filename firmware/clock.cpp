@@ -4,12 +4,16 @@
 #include "Adafruit_GFX.h"
 
 bool isDST(int dayOfMonth, int month, int dayOfWeek, String location);
+void refreshDisplayTime();
+
+Adafruit_7segment display = Adafruit_7segment();
 
 const int ONE_DAY_MILLIS = 24 * 60 * 60 * 1000;
 unsigned long lastSync = millis();
 int timeZone = -8; //UTC time zone TODO: Must be set/recieved from web/cloud
 String DSTRule = "US"; //DST Rule - US, EU, and OFF TODO: Must be set/recieved from web/cloud
 int DSTJumpHour; //When DST takes effect
+bool hourFormat = "12" //12 or 24 TODO: Must be set/recieved from web/cloud
 
 void setup() {
   //Set the DSTJumpHour according to the DSTRule
@@ -23,6 +27,10 @@ void setup() {
 
   //Set the proper time zone
   Time.zone(isDST(Time.day(), Time.month(), Time.weekday(), DSTRule) ? timeZone+1 : timeZone);
+
+  //Setup the 7-segment display
+  display.begin(0x70);
+  display.setBrightness(15); //TODO: adjust brightness to optimize for veneer/time
 }
 
 void loop() {
@@ -36,6 +44,9 @@ void loop() {
   if(Time.hour() == DSTJumpHour && Time.minute() == 0) {
     Time.zone(isDST(Time.day(), Time.month(), Time.weekday(), DSTRule) ? timeZone+1 : timeZone);
   }
+
+  //Update the 7-segment display
+  refreshDisplayTime();
 
   //Delay for checking alarms/timers
   Alarm.delay(500);
@@ -79,4 +90,23 @@ bool isDST(int dayOfMonth, int month, int dayOfWeek, String location) {
   } else {
     return false;
   }
+}
+
+//display the current time on the 7-segment display TODO: Allow both 12 and 24 hour formats
+void refreshDisplayTime() {
+  int currentTime = Time.now();
+  if(hourFormat == "12") {
+    int hour = Time.hourFormat12(currentTime);
+  } else {
+    int hour = Time.hour(currentTime);
+  }
+  int minute = Time.minute(currentTime);
+  display.drawColon(true);
+  if(hour/10 != 0) {
+    display.writeDigitNum(0, hour/10);
+  }
+  display.writeDigitNum(1, hour%10);
+  display.writeDigitNum(2, minute/10);
+  display.writeDigitNum(3, minute%10);
+  display.writeDisplay();
 }
