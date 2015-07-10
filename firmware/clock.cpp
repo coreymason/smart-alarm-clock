@@ -2,6 +2,7 @@
 #include "TimeAlarms.h"
 #include "Adafruit_LEDBackpack.h"
 #include "Adafruit_GFX.h"
+#undef now()
 
 bool isDST(int dayOfMonth, int month, int dayOfWeek, String rule);
 void refreshDisplayTime();
@@ -13,7 +14,7 @@ unsigned long lastSync = millis();
 int timeZone = -8; //UTC time zone offset TODO: Must be set/recieved from web/cloud
 String DSTRule = "US"; //US, EU, or OFF TODO: Must be set/recieved from web/cloud
 int DSTJumpHour; //When DST takes effect
-bool hourFormat = "12" //12 or 24 TODO: Must be set/recieved from web/cloud
+int hourFormat = 12; //12 or 24 TODO: Must be set/recieved from web/cloud
 
 void setup() {
   if(DSTRule == "US") {
@@ -24,7 +25,7 @@ void setup() {
     DSTJumpHour = 0;
   }
 
-  //Set the proper time zone
+  //Set the proper time zone according to DST status
   Time.zone(isDST(Time.day(), Time.month(), Time.weekday(), DSTRule) ? timeZone+1 : timeZone);
 
   //Setup the 7-segment display
@@ -35,7 +36,7 @@ void setup() {
 void loop() {
   //Request time synchronization from the Spark Cloud every 24 hours
   if (millis() - lastSync > ONE_DAY_MILLIS) {
-    Spark.syncTime();
+    //Spark.syncTime();
     lastSync = millis();
   }
 
@@ -97,13 +98,15 @@ bool isDST(int dayOfMonth, int month, int dayOfWeek, String rule) {
 
 //display the current time on the 7-segment display
 void refreshDisplayTime() {
-  int currentTime = Time.now();
-  if(hourFormat == "12") {
-    int hour = Time.hourFormat12(currentTime);
-  } else {
-    int hour = Time.hour(currentTime);
-  }
+  unsigned long currentTime = Time.now();
   int minute = Time.minute(currentTime);
+  int hour;
+  
+  if(hourFormat == 12) {
+    hour = Time.hourFormat12(currentTime);
+  } else {
+    hour = Time.hour(currentTime);
+  }
 
   display.drawColon(true);
   if(hour/10 != 0) {
