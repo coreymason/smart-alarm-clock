@@ -36,7 +36,7 @@ void setup() {
 void loop() {
   //Request time synchronization from the Spark Cloud every 24 hours
   if (millis() - lastSync > ONE_DAY_MILLIS) {
-    //Spark.syncTime();
+    Spark.syncTime();
     lastSync = millis();
   }
 
@@ -101,19 +101,17 @@ void refreshDisplayTime() {
   unsigned long currentTime = Time.now();
   int minute = Time.minute(currentTime);
   int hour;
-  
+  int digits;
+
   if(hourFormat == 12) {
     hour = Time.hourFormat12(currentTime);
   } else {
     hour = Time.hour(currentTime);
   }
 
+  digits = hour/10*1000 + hour%10*100 + minute/10*10 + minute%10;
+
+  display.print(digits);
   display.drawColon(true);
-  if(hour/10 != 0) {
-    display.writeDigitNum(0, hour/10);
-  }
-  display.writeDigitNum(1, hour%10);
-  display.writeDigitNum(2, minute/10);
-  display.writeDigitNum(3, minute%10);
   display.writeDisplay();
 }
