@@ -2,12 +2,15 @@
 #include "TimeAlarms.h"
 #include "Adafruit_LEDBackpack.h"
 #include "Adafruit_GFX.h"
+#include "Adafruit_MCP9808.h"
 #undef now()
 
 bool isDST(int dayOfMonth, int month, int dayOfWeek, String rule);
 void refreshDisplayTime();
 
 Adafruit_7segment display = Adafruit_7segment();
+Adafruit_MCP9808 tempSensor = Adafruit_MCP9808();
+
 
 const int ONE_DAY_MILLIS = 24 * 60 * 60 * 1000;
 unsigned long lastSync = millis();
@@ -15,6 +18,7 @@ int timeZone = -8; //UTC time zone offset TODO: Must be set/recieved from web/cl
 String DSTRule = "US"; //US, EU, or OFF TODO: Must be set/recieved from web/cloud
 int DSTJumpHour; //When DST takes effect
 int hourFormat = 12; //12 or 24 TODO: Must be set/recieved from web/cloud
+double temp;
 
 void setup() {
   if(DSTRule == "US") {
@@ -31,12 +35,18 @@ void setup() {
   //Setup the 7-segment display
   display.begin(0x70);
   display.setBrightness(15); //TODO: adjust brightness to optimize for veneer/time
+
+  //Setup the temperature sensor
+  tempSensor.setResolution(MCP9808_SLOWEST);
+
+  //Cloud variables
+  Spark.variable("Temperature", &temp, DOUBLE);
 }
 
 void loop() {
   //Request time synchronization from the Spark Cloud every 24 hours
   if (millis() - lastSync > ONE_DAY_MILLIS) {
-    Spark.syncTime();
+    //Spark.syncTime();
     lastSync = millis();
   }
 
@@ -46,6 +56,9 @@ void loop() {
   }
 
   refreshDisplayTime();
+
+  //testing temp sensor
+  temp = tempSensor.getTemperature();
 
   //Delay for checking alarms/timers
   Alarm.delay(500);
