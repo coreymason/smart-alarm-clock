@@ -7,6 +7,9 @@
 
 bool isDST(int dayOfMonth, int month, int dayOfWeek, String rule);
 void refreshDisplayTime();
+void setAlarm(int hour, int minute, int second, bool isOnce);
+void setAlarm(int hour, int minute, int second, bool isOnce, int dayOfWeek); //Sunday = 1
+void SoundAlarm();
 
 Adafruit_7segment display = Adafruit_7segment();
 Adafruit_MCP9808 tempSensor = Adafruit_MCP9808();
@@ -14,11 +17,15 @@ Adafruit_MCP9808 tempSensor = Adafruit_MCP9808();
 
 const int ONE_DAY_MILLIS = 24 * 60 * 60 * 1000;
 unsigned long lastSync = millis();
+unsigned long lastBeep = millis();
 int timeZone = -8; //UTC time zone offset TODO: Must be set/recieved from web/cloud
 String DSTRule = "US"; //US, EU, or OFF TODO: Must be set/recieved from web/cloud
 int DSTJumpHour; //When DST takes effect
 int hourFormat = 12; //12 or 24 TODO: Must be set/recieved from web/cloud
 double temp;
+bool alarm = false;
+
+int piezoPin = A4;
 
 void setup() {
   if(DSTRule == "US") {
@@ -46,7 +53,7 @@ void setup() {
 void loop() {
   //Request time synchronization from the Spark Cloud every 24 hours
   if (millis() - lastSync > ONE_DAY_MILLIS) {
-    //Spark.syncTime();
+    Spark.syncTime();
     lastSync = millis();
   }
 
@@ -56,12 +63,18 @@ void loop() {
   }
 
   refreshDisplayTime();
-
-  //testing temp sensor
   temp = tempSensor.getTemperature();
 
+  //Sound alarm check
+  if(alarm) {
+    if(millis() - lastBeep > 600) {
+      lastBeep = millis();
+      tone(piezoPin, 4000, 300);
+    }
+  }
+
   //Delay for checking alarms/timers
-  Alarm.delay(500);
+  Alarm.delay(1);
 }
 
 //Return true if DST is currently observed
@@ -127,4 +140,24 @@ void refreshDisplayTime() {
   display.print(digits);
   display.drawColon(true);
   display.writeDisplay();
+}
+
+void setAlarm(int hour, int minute, int second, bool isOnce) {
+  if(isOnce) {
+    Alarm.alarmOnce(hour, minute, second, SoundAlarm);
+  } else {
+    Alarm.alarmRepeat(hour, minute, second, SoundAlarm);
+  }
+}
+
+void setAlarm(int hour, int minute, int second, bool isOnce, int dayOfWeek) {
+  if(isOnce) {
+    Alarm.alarmOnce(dayOfWeek, hour, minute, second, SoundAlarm);
+  } else {
+    Alarm.alarmRepeat(dayOfWeek, hour, minute, second, SoundAlarm);
+  }
+}
+
+void SoundAlarm() {
+  alarm = true;
 }
