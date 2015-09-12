@@ -7,9 +7,9 @@
 
 bool isDST(int dayOfMonth, int month, int dayOfWeek, String rule);
 void refreshDisplayTime();
-void setAlarm(int hour, int minute, int second, bool isOnce);
-void setAlarm(int hour, int minute, int second, bool isOnce, int dayOfWeek); //Sunday = 1
+void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool sound, int dayOfWeek); //ignore = -1, Sunday = 1, etc
 void SoundAlarm();
+void LightAlarm();
 
 Adafruit_7segment display = Adafruit_7segment();
 Adafruit_MCP9808 tempSensor = Adafruit_MCP9808();
@@ -143,22 +143,69 @@ void refreshDisplayTime() {
   display.writeDisplay();
 }
 
-void setAlarm(int hour, int minute, int second, bool isOnce) {
-  if(isOnce) {
-    Alarm.alarmOnce(hour, minute, second, SoundAlarm);
-  } else {
-    Alarm.alarmRepeat(hour, minute, second, SoundAlarm);
-  }
-}
+//TODO: testing and check logic as well as corner cases
+//TODO: Handle issues when a LightAlarm is not st 30 minutes in advance
+//Set an alarm according to the given parameters
+void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool sound, int dayOfWeek) {
+  /*unsigned long currentTime = Time.now();
+  int currentDay = Time.weekday(currentTime);
+  int currentHour = Time.hour(currentTime);
+  int currentMinute = Time.minute(currentTime);
+  int timeUntil;*/
+  int day2, hour2, minute2;
 
-void setAlarm(int hour, int minute, int second, bool isOnce, int dayOfWeek) {
-  if(isOnce) {
-    Alarm.alarmOnce(dayOfWeek, hour, minute, second, SoundAlarm);
-  } else {
-    Alarm.alarmRepeat(dayOfWeek, hour, minute, second, SoundAlarm);
+  //disable light if there is not enough time (30 minutes)
+  /*if(dayOfWeek == -1) {
+    timeUntil = (hour*60 + minute) - (currentHour*60 + currentMinute);
+  } else { //needs to account for circular nature of week
+    //timeUntil = (dayOfWeek*24*60 + hour*60 + minute) - (currentDay*24*60 + currentHour*60 + currentMinute);
+  }
+  if(timeUntil > 0 && timeUntil < 30) {
+    light = false;
+  } */
+
+  //set a LightAlarm to go off 30 minutes early if light is enabled
+  if(light) {
+    minute2 = minute - 30;
+    if(minute2 < 0) {
+      minute2 = 60 + minute2;
+      hour2 = hour - 1;
+      if(hour2 < 0) {
+        hour2 = 23;
+        if(dayOfWeek != -1) {
+          day2 = 7;
+        }
+      }
+    }
+    if(isOnce) {
+      if(dayOfWeek != -1) {
+        Alarm.alarmOnce(day2, hour, minute, second, LightAlarm);
+      } else {
+        Alarm.alarmOnce(hour, minute, second, LightAlarm);
+      }
+    } else {
+      if(dayOfWeek != -1) {
+        Alarm.alarmRepeat(day2, hour, minute, second, LightAlarm);
+      } else {
+        Alarm.alarmRepeat(hour, minute, second, LightAlarm);
+      }
+    }
+  }
+
+  //set a SoundAlarm if sound is enabled or if both sound and light are disabled
+  if(sound || (!light && !sound)) {
+    if(isOnce) {
+      Alarm.alarmOnce(hour, minute, second, SoundAlarm);
+    } else {
+      Alarm.alarmRepeat(hour, minute, second, SoundAlarm);
+    }
   }
 }
 
 void SoundAlarm() {
   alarm = true;
+}
+
+void LightAlarm() {
+  //start 30 minute led fade in
 }
