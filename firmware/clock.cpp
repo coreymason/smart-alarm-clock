@@ -195,9 +195,17 @@ void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool so
   //set a SoundAlarm if sound is enabled or if both sound and light are disabled
   if(sound || (!light && !sound)) {
     if(isOnce) {
-      Alarm.alarmOnce(hour, minute, second, SoundAlarm);
+      if(dayOfWeek != -1) {
+        Alarm.alarmOnce(dayOfWeek, hour, minute, second, SoundAlarm);
+      } else {
+        Alarm.alarmOnce(hour, minute, second, SoundAlarm);
+      }
     } else {
-      Alarm.alarmRepeat(hour, minute, second, SoundAlarm);
+      if(dayOfWeek != -1) {
+        Alarm.alarmRepeat(dayOfWeek, hour, minute, second, SoundAlarm);
+      } else {
+        Alarm.alarmRepeat(hour, minute, second, SoundAlarm);
+      }
     }
   }
 }
