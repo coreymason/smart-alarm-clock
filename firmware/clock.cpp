@@ -24,6 +24,7 @@ int DSTJumpHour; //When DST takes effect
 int hourFormat = 12; //12 or 24 TODO: Must be set/recieved from web/cloud
 double temp;
 bool alarm = false;
+int piezoHertz = 2000; //Piezo alarm frequency TODO: Must be set/recieved from web/cloud
 
 int piezoPin = A4;
 
@@ -69,7 +70,7 @@ void loop() {
   if(alarm) {
     if(millis() - lastBeep > 600) {
       lastBeep = millis();
-      tone(piezoPin, 4000, 300);
+      tone(piezoPin, piezoHertz, 300);
     }
   }
 
