@@ -9,14 +9,15 @@
 bool isDST(int dayOfMonth, int month, int dayOfWeek, String rule);
 void refreshDisplayTime();
 void addAlarms();
+void markDelete(int hour, int minute);
 int checkDelete(AlarmID_t ID);
 void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool sound, int dayOfWeek); //ignore = -1, Sunday = 1, etc
 void SoundAlarm();
 void LightAlarm();
+void lightFadeIn(int hour, int minute);
 
 Adafruit_7segment display = Adafruit_7segment();
 Adafruit_MCP9808 tempSensor = Adafruit_MCP9808();
-
 
 const int ONE_DAY_MILLIS = 24 * 60 * 60 * 1000;
 unsigned long lastSync = millis();
@@ -170,9 +171,9 @@ void addAlarms() {
 }
 
 //Mark an alarm for deletion
-void markDelete(int hour, int minute) {
+void markDelete(int day, int hour, int minute) {
   for(int i=0;i<preferences.alarmTimes.size();i++) {
-    if(preferences.alarmTimes.at(i).at(0) == hour && preferences.alarmTimes.at(i).at(1) == minute) {
+    if(preferences.alarmTimes.at(i).at(6) == day && preferences.alarmTimes.at(i).at(0) == hour && preferences.alarmTimes.at(i).at(1) == minute) {
       preferences.alarmTimes.at(i).at(7) = true;
     }
   }
@@ -199,26 +200,55 @@ int checkDelete(AlarmID_t ID) {
   return alarmIndex;
 }
 
-//TODO: fix alarm not going off when 30 minutes early precedes current time
 //Set an alarm according to the given parameters
 void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool sound, int dayOfWeek) {
-  int day2, hour2, minute2;
+  unsigned long currentTime = Time.now();
+  int currentDay = Time.weekday(currentTime);
+  int currentHour = Time.hour(currentTime);
+  int currentMinute = Time.minute(currentTime);
+  int day2 = dayOfWeek;
+  int hour2 = hour;
+  int minute2 = minute;
 
   //set a LightAlarm to go off 30 minutes early if light is enabled
   if(light) {
-    minute2 = minute - 30;
+    minute2 -= 30;
     if(minute2 < 0) {
       minute2 = 60 + minute2;
-      hour2 = hour - 1;
+      hour2 -= 1;
       if(hour2 < 0) {
         hour2 = 23;
-        if(dayOfWeek != -1) {
+        day2 -= 1;
+        if(day2 < 1) {
           day2 = 7;
         }
       }
     }
+
+    bool enoughTime = true;
+    currentMinute -= 30;
+    if(currentMinute < 0) {
+      currentMinute = 60 + currentMinute;
+      currentHour -= 1;
+      if(currentHour < 0) {
+        currentHour = 23;
+        currentDay -= 1;
+        if(currentDay < 1) {
+          currentDay = 7;
+        }
+      }
+    }
+    if(currentDay == day2 && currentHour >= hour2 && currentMinute >= minute2) {
+      enoughTime = false;
+    }
+
+    if(!enoughTime) {
+
+    }
     if(isOnce) {
-      if(dayOfWeek != -1) {
+      if(!enoughTime) {
+        markDelete(dayOfWeek, hour, minute);
+      } else if(dayOfWeek != -1) {
         Alarm.alarmOnce(day2, hour2, minute2, second, LightAlarm);
       } else {
         Alarm.alarmOnce(hour2, minute2, second, LightAlarm);
@@ -265,5 +295,9 @@ void LightAlarm() {
   if(alarmIndex == 0) {
     return;
   }
-  //start 30 minute led fade in
+  lightFadeIn(preferences.alarmTimes.at(alarmIndex).at(0), preferences.alarmTimes.at(alarmIndex).at(1));
+}
+
+void lightFadeIn(int hour, int minute) {
+  //start led fade in to given time
 }
