@@ -3,10 +3,13 @@
 #include "Adafruit_LEDBackpack.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_MCP9808.h"
+#include <vector>
 #undef now()
 
 bool isDST(int dayOfMonth, int month, int dayOfWeek, String rule);
 void refreshDisplayTime();
+void addAlarms();
+int checkDelete(AlarmID_t ID);
 void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool sound, int dayOfWeek); //ignore = -1, Sunday = 1, etc
 void SoundAlarm();
 void LightAlarm();
@@ -18,31 +21,46 @@ Adafruit_MCP9808 tempSensor = Adafruit_MCP9808();
 const int ONE_DAY_MILLIS = 24 * 60 * 60 * 1000;
 unsigned long lastSync = millis();
 unsigned long lastBeep = millis();
-int timeZone = -8; //UTC time zone offset TODO: Must be set/recieved from web/cloud
-String DSTRule = "US"; //US, EU, or OFF TODO: Must be set/recieved from web/cloud
 int DSTJumpHour; //When DST takes effect
-int hourFormat = 12; //12 or 24 TODO: Must be set/recieved from web/cloud
 double temp;
 bool alarm = false;
-int piezoHertz = 2000; //Piezo alarm frequency TODO: Must be set/recieved from web/cloud
+
+struct Preferences {
+  int timeZone; //UTC time zone offset
+  int hourFormat; //12 or 24
+  int piezoHertz; //Piezo alarm frequency
+  String DSTRule; //US, EU, or OFF
+  std::vector<std::vector<int>> alarmTimes; // {hour, minute, second, isOnce, light, sound, dayOfWeek, del}
+} preferences;
 
 int piezoPin = A4;
 
 void setup() {
-  if(DSTRule == "US") {
+  if(EEPROM.read(0) == 117) {
+    EEPROM.get(1, preferences);
+  } else {
+    preferences = {-8, 12, 2000, "US"};
+    EEPROM.put(1, preferences);
+    EEPROM.put(0, 117);
+  }
+
+  if(preferences.DSTRule == "US") {
     DSTJumpHour = 2;
-  } else if(DSTRule == "EU") {
-    DSTJumpHour = 1+timeZone;
+  } else if(preferences.DSTRule == "EU") {
+    DSTJumpHour = 1 + preferences.timeZone;
   } else {
     DSTJumpHour = 0;
   }
 
   //Set the proper time zone according to DST status
-  Time.zone(isDST(Time.day(), Time.month(), Time.weekday(), DSTRule) ? timeZone+1 : timeZone);
+  Time.zone(isDST(Time.day(), Time.month(), Time.weekday(), preferences.DSTRule) ? preferences.timeZone + 1 : preferences.timeZone);
 
   //Setup the 7-segment display
   display.begin(0x70);
   display.setBrightness(15); //TODO: adjust brightness to optimize for veneer/time
+
+  //Add alarms stored in eeprom
+  addAlarms();
 
   //Setup the temperature sensor
   tempSensor.setResolution(MCP9808_SLOWEST);
@@ -60,7 +78,7 @@ void loop() {
 
   //Update time zone at DSTJumpHour incase DST is now in effect
   if(Time.hour() == DSTJumpHour && Time.minute() == 0) {
-    Time.zone(isDST(Time.day(), Time.month(), Time.weekday(), DSTRule) ? timeZone+1 : timeZone);
+    Time.zone(isDST(Time.day(), Time.month(), Time.weekday(), preferences.DSTRule) ? preferences.timeZone + 1 : preferences.timeZone);
   }
 
   refreshDisplayTime();
@@ -70,7 +88,7 @@ void loop() {
   if(alarm) {
     if(millis() - lastBeep > 600) {
       lastBeep = millis();
-      tone(piezoPin, piezoHertz, 300);
+      tone(piezoPin, preferences.piezoHertz, 300);
     }
   }
 
@@ -130,7 +148,7 @@ void refreshDisplayTime() {
   int hour;
   int digits;
 
-  if(hourFormat == 12) {
+  if(preferences.hourFormat == 12) {
     hour = Time.hourFormat12(currentTime);
   } else {
     hour = Time.hour(currentTime);
@@ -143,26 +161,39 @@ void refreshDisplayTime() {
   display.writeDisplay();
 }
 
-//TODO: testing and check logic as well as corner cases
-//TODO: Handle issues when a LightAlarm is not st 30 minutes in advance
+//Add alarms from eeprom
+void addAlarms() {
+  for(int i=0;i<preferences.alarmTimes.size();i++) {
+    setAlarm(preferences.alarmTimes.at(i).at(0), preferences.alarmTimes.at(i).at(1), preferences.alarmTimes.at(i).at(2), preferences.alarmTimes.at(3),
+     preferences.alarmTimes.at(i).at(4), preferences.alarmTimes.at(i).at(5), preferences.alarmTimes.at(i).at(6));
+  }
+}
+
+//Check and if marked, delete the alarm from eeprom and TimeAlarms
+//Returns 0 if deleted, -1 if not found, or the vector index
+int checkDelete(AlarmID_t ID) {
+  unsigned long currentTime = Time.now();
+  int hour = Time.hour(currentTime);
+  int minute = Time.minute(currentTime);
+  int alarmIndex = -1;
+
+  for(int i=0;i<preferences.alarmTimes.size();i++) {
+    if(preferences.alarmTimes.at(i).at(0) == hour && preferences.alarmTimes.at(i).at(1) == minute) {
+      alarmIndex = i;
+      if(preferences.alarmTimes.at(i).at(7) == true) {
+        Alarm.free(ID);
+        preferences.alarmTimes.erase(i);
+        return 0;
+      }
+    }
+  }
+  return alarmIndex;
+}
+
+//TODO: fix alarm not going off when 30 minutes early precedes current time
 //Set an alarm according to the given parameters
 void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool sound, int dayOfWeek) {
-  /*unsigned long currentTime = Time.now();
-  int currentDay = Time.weekday(currentTime);
-  int currentHour = Time.hour(currentTime);
-  int currentMinute = Time.minute(currentTime);
-  int timeUntil;*/
   int day2, hour2, minute2;
-
-  //disable light if there is not enough time (30 minutes)
-  /*if(dayOfWeek == -1) {
-    timeUntil = (hour*60 + minute) - (currentHour*60 + currentMinute);
-  } else { //needs to account for circular nature of week
-    //timeUntil = (dayOfWeek*24*60 + hour*60 + minute) - (currentDay*24*60 + currentHour*60 + currentMinute);
-  }
-  if(timeUntil > 0 && timeUntil < 30) {
-    light = false;
-  } */
 
   //set a LightAlarm to go off 30 minutes early if light is enabled
   if(light) {
@@ -179,15 +210,15 @@ void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool so
     }
     if(isOnce) {
       if(dayOfWeek != -1) {
-        Alarm.alarmOnce(day2, hour, minute, second, LightAlarm);
+        Alarm.alarmOnce(day2, hour2, minute2, second, LightAlarm);
       } else {
-        Alarm.alarmOnce(hour, minute, second, LightAlarm);
+        Alarm.alarmOnce(hour2, minute2, second, LightAlarm);
       }
     } else {
       if(dayOfWeek != -1) {
-        Alarm.alarmRepeat(day2, hour, minute, second, LightAlarm);
+        Alarm.alarmRepeat(day2, hour2, minute2, second, LightAlarm);
       } else {
-        Alarm.alarmRepeat(hour, minute, second, LightAlarm);
+        Alarm.alarmRepeat(hour2, minute2, second, LightAlarm);
       }
     }
   }
@@ -208,12 +239,22 @@ void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool so
       }
     }
   }
+
+  preferences.lightAlarmTimes.push_back(hour, minute, second, isOnce, light, sound, dayOfWeek, false);
 }
 
 void SoundAlarm() {
+  int alarmIndex = checkDelete(Alarm.getTriggeredAlarmId());
+  if(alarmIndex == 0) {
+    return;
+  }
   alarm = true;
 }
 
 void LightAlarm() {
+  int alarmIndex = checkDelete(Alarm.getTriggeredAlarmId());
+  if(alarmIndex == 0) {
+    return;
+  }
   //start 30 minute led fade in
 }
