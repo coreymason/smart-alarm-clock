@@ -169,6 +169,15 @@ void addAlarms() {
   }
 }
 
+//Mark an alarm for deletion
+void markDelete(int hour, int minute) {
+  for(int i=0;i<preferences.alarmTimes.size();i++) {
+    if(preferences.alarmTimes.at(i).at(0) == hour && preferences.alarmTimes.at(i).at(1) == minute) {
+      preferences.alarmTimes.at(i).at(7) = true;
+    }
+  }
+}
+
 //Check and if marked, delete the alarm from eeprom and TimeAlarms
 //Returns 0 if deleted, -1 if not found, or the vector index
 int checkDelete(AlarmID_t ID) {
