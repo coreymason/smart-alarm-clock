@@ -3,8 +3,9 @@
 #include "Adafruit_LEDBackpack.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_MCP9808.h"
-#include <vector>
 #undef now()
+#undef swap()
+#include <vector>
 
 bool isDST(int dayOfMonth, int month, int dayOfWeek, String rule);
 void refreshDisplayTime();
@@ -27,7 +28,6 @@ unsigned long lightF;
 int maxBrightness;
 int DSTJumpHour; //When DST takes effect
 int driverCurrent = 1000; //Driver current output (in mA)
-int maxBrightness;
 double temp;
 bool alarm = false;
 bool light = false;
@@ -185,8 +185,8 @@ void refreshDisplayTime() {
 //Add alarms from eeprom
 void addAlarms() {
   for(int i=0;i<preferences.alarmTimes.size();i++) {
-    setAlarm(preferences.alarmTimes.at(i).at(0), preferences.alarmTimes.at(i).at(1), preferences.alarmTimes.at(i).at(2), preferences.alarmTimes.at(3),
-     preferences.alarmTimes.at(i).at(4), preferences.alarmTimes.at(i).at(5), preferences.alarmTimes.at(i).at(6));
+    setAlarm(preferences.alarmTimes.at(i).at(0), preferences.alarmTimes.at(i).at(1), preferences.alarmTimes.at(i).at(2),
+      preferences.alarmTimes.at(i).at(3), preferences.alarmTimes.at(i).at(4), preferences.alarmTimes.at(i).at(5), preferences.alarmTimes.at(i).at(6));
   }
 }
 
@@ -199,7 +199,7 @@ void markDelete(int day, int hour, int minute) {
   }
 }
 
-//Check and if marked, delete the alarm from eeprom and TimeAlarms
+//Check if marked, if so delete the alarm from eeprom and TimeAlarms
 //Returns 0 if deleted, -1 if not found, or the vector index
 int checkDelete(AlarmID_t ID) {
   unsigned long currentTime = Time.now();
@@ -212,7 +212,7 @@ int checkDelete(AlarmID_t ID) {
       alarmIndex = i;
       if(preferences.alarmTimes.at(i).at(7) == true) {
         Alarm.free(ID);
-        preferences.alarmTimes.erase(i);
+        preferences.alarmTimes.erase(preferences.alarmTimes.begin() + i);
         return 0;
       }
     }
@@ -299,7 +299,16 @@ void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool so
     }
   }
 
-  preferences.lightAlarmTimes.push_back(hour, minute, second, isOnce, light, sound, dayOfWeek, false);
+  std::vector<int> temp;
+  temp.push_back(hour);
+  temp.push_back(minute);
+  temp.push_back(second);
+  temp.push_back(isOnce);
+  temp.push_back(light);
+  temp.push_back(sound);
+  temp.push_back(dayOfWeek);
+  temp.push_back(false);
+  preferences.alarmTimes.push_back(temp);
 }
 
 void SoundAlarm() {
