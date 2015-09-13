@@ -16,6 +16,7 @@ void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool so
 void SoundAlarm();
 void LightAlarm();
 void lightFadeIn(int hour, int minute);
+void alarmOff();
 
 Adafruit_7segment display = Adafruit_7segment();
 Adafruit_MCP9808 tempSensor = Adafruit_MCP9808();
@@ -337,4 +338,10 @@ void lightFadeIn(int hour, int minute) {
   lightF = lightS + difference*60;
   maxBrightness = 4095*(preferences.LEDCurrent/driverCurrent)*(preferences.ledBrightness/100);
   light = true;
+}
+
+//Turn off all active alarms
+void alarmOff() {
+  alarm = false;
+  light = false;
 }
