@@ -22,25 +22,35 @@ Adafruit_MCP9808 tempSensor = Adafruit_MCP9808();
 const int ONE_DAY_MILLIS = 24 * 60 * 60 * 1000;
 unsigned long lastSync = millis();
 unsigned long lastBeep = millis();
+unsigned long lightS;
+unsigned long lightF;
+int maxBrightness;
 int DSTJumpHour; //When DST takes effect
+int driverCurrent = 1000; //Driver current output (in mA)
+int maxBrightness;
 double temp;
 bool alarm = false;
+bool light = false;
 
 struct Preferences {
   int timeZone; //UTC time zone offset
   int hourFormat; //12 or 24
   int piezoHertz; //Piezo alarm frequency
+  int LEDCurrent; //LED current rating (in mA)
+  int ledBrightness; //Maximum brightness (0 to 100%)
   String DSTRule; //US, EU, or OFF
   std::vector<std::vector<int>> alarmTimes; // {hour, minute, second, isOnce, light, sound, dayOfWeek, del}
 } preferences;
 
 int piezoPin = A4;
+int LEDPin = A7;
 
 void setup() {
   if(EEPROM.read(0) == 117) {
     EEPROM.get(1, preferences);
   } else {
-    preferences = {-8, 12, 2000, "US"};
+    std::vector<std::vector<int>> alarmTimes;
+    preferences = {-8, 12, 2000, .7, 100, "US", alarmTimes};
     EEPROM.put(1, preferences);
     EEPROM.put(0, 117);
   }
@@ -60,6 +70,9 @@ void setup() {
   display.begin(0x70);
   display.setBrightness(15); //TODO: adjust brightness to optimize for veneer/time
 
+  //Pin setup
+  pinMode(LEDPin, OUTPUT);
+
   //Add alarms stored in eeprom
   addAlarms();
 
@@ -71,6 +84,8 @@ void setup() {
 }
 
 void loop() {
+  unsigned long currentTime = Time.now();
+
   //Request time synchronization from the Spark Cloud every 24 hours
   if (millis() - lastSync > ONE_DAY_MILLIS) {
     Spark.syncTime();
@@ -78,8 +93,8 @@ void loop() {
   }
 
   //Update time zone at DSTJumpHour incase DST is now in effect
-  if(Time.hour() == DSTJumpHour && Time.minute() == 0) {
-    Time.zone(isDST(Time.day(), Time.month(), Time.weekday(), preferences.DSTRule) ? preferences.timeZone + 1 : preferences.timeZone);
+  if(Time.hour(currentTime) == DSTJumpHour && Time.minute(currentTime) == 0) {
+    Time.zone(isDST(Time.day(currentTime), Time.month(currentTime), Time.weekday(currentTime), preferences.DSTRule) ? preferences.timeZone + 1 : preferences.timeZone);
   }
 
   refreshDisplayTime();
@@ -91,6 +106,11 @@ void loop() {
       lastBeep = millis();
       tone(piezoPin, preferences.piezoHertz, 300);
     }
+  }
+
+  //Light alarm check
+  if(light) {
+    analogWrite(LEDPin, min(maxBrightness, ((currentTime - lightS) / (lightF - lightS)) * maxBrightness));
   }
 
   //Delay for checking alarms/timers
@@ -298,6 +318,14 @@ void LightAlarm() {
   lightFadeIn(preferences.alarmTimes.at(alarmIndex).at(0), preferences.alarmTimes.at(alarmIndex).at(1));
 }
 
+//Start light fade in to a given time
 void lightFadeIn(int hour, int minute) {
-  //start led fade in to given time
+  lightS = Time.now();
+  int difference = (hour*60 + minute) - (Time.hour(lightS)*60 + Time.minute(lightS));
+  if(difference < 0) {
+    difference += 24*60;
+  }
+  lightF = lightS + difference*60;
+  maxBrightness = 4095*(preferences.LEDCurrent/driverCurrent)*(preferences.ledBrightness/100);
+  light = true;
 }
