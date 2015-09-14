@@ -12,6 +12,8 @@ void refreshDisplayTime();
 void addAlarms();
 void markDelete(int hour, int minute);
 int checkDelete(AlarmID_t ID);
+int deleteAlarm(String command);
+int createAlarm(String command);
 void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool sound, int dayOfWeek); //ignore = -1, Sunday = 1, etc
 void SoundAlarm();
 void LightAlarm();
@@ -80,7 +82,9 @@ void setup() {
   //Setup the temperature sensor
   tempSensor.setResolution(MCP9808_SLOWEST);
 
-  //Cloud variables
+  //Cloud functions and variables
+  Spark.function("CreateAlarm", createAlarm);
+  Spark.function("DeleteAlarm", deleteAlarm);
   Spark.variable("Temperature", &temp, DOUBLE);
 }
 
@@ -219,6 +223,36 @@ int checkDelete(AlarmID_t ID) {
     }
   }
   return alarmIndex;
+}
+
+//Deletes an alarm from the cloud
+//hh.mm.dd
+int deleteAlarm(String command) {
+  if(command.length() != 7 || command.length() != 8) {
+    return -1;
+  }
+  int hour = command.substring(0,2).toInt();
+  int minute = command.substring(3,5).toInt();
+  int day = command.substring(6).toInt();
+  markDelete(day, hour, minute);
+  return 1;
+}
+
+//Creates an alarm from the cloud
+//hh.mm.ss.b.b.b.d (b = 1/0) (d = -1 or 1,2,3,4,5,6,7)
+int createAlarm(String command) {
+  if(command.length() != 16 || command.length() != 17) {
+    return -1;
+  }
+  int hour = command.substring(0,2).toInt();
+  int minute = command.substring(3,5).toInt();
+  int second = command.substring(6,8).toInt();
+  int isOnce = command.substring(9,10).toInt();
+  int light = command.substring(11,12).toInt();
+  int sound = command.substring(13,14).toInt();
+  int dayOfWeek = command.substring(15).toInt();
+  setAlarm(hour, minute, second, isOnce, light, sound, dayOfWeek);
+  return 1;
 }
 
 //Set an alarm according to the given parameters
