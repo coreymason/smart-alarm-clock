@@ -3,6 +3,7 @@
 #include "Adafruit_LEDBackpack.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_MCP9808.h"
+#include "Adafruit_TPA2016.h"
 #undef now()
 #undef swap()
 #include <vector>
@@ -22,6 +23,7 @@ void alarmOff();
 
 Adafruit_7segment display = Adafruit_7segment();
 Adafruit_MCP9808 tempSensor = Adafruit_MCP9808();
+Adafruit_TPA2016 audioAmp = Adafruit_TPA2016();
 
 const int ONE_DAY_MILLIS = 24 * 60 * 60 * 1000;
 unsigned long lastSync = millis();
@@ -69,18 +71,18 @@ void setup() {
   //Set the proper time zone according to DST status
   Time.zone(isDST(Time.day(), Time.month(), Time.weekday(), preferences.DSTRule) ? preferences.timeZone + 1 : preferences.timeZone);
 
-  //Setup the 7-segment display
+  //Setup the 7-segment display, temperature sensor, and audio amp
   display.begin(0x70);
   display.setBrightness(15); //TODO: adjust brightness to optimize for veneer/time
+  tempSensor.begin();
+  tempSensor.setResolution(MCP9808_SLOWEST);
+  audioAmp.begin();
 
   //Pin setup
   pinMode(LEDPin, OUTPUT);
 
   //Add alarms stored in eeprom
   addAlarms();
-
-  //Setup the temperature sensor
-  tempSensor.setResolution(MCP9808_SLOWEST);
 
   //Cloud functions and variables
   Spark.function("CreateAlarm", createAlarm);
@@ -102,8 +104,14 @@ void loop() {
     Time.zone(isDST(Time.day(currentTime), Time.month(currentTime), Time.weekday(currentTime), preferences.DSTRule) ? preferences.timeZone + 1 : preferences.timeZone);
   }
 
+  //Update the 7-segment display
   refreshDisplayTime();
-  temp = tempSensor.getTemperature();
+
+  //Record data from sensors every 5 minutes
+  if(Time.minute(currentTime) % 5) {
+    temp = tempSensor.getTemperature();
+    //TODO: Send and/or record data
+  }
 
   //Sound alarm check
   if(alarm) {
