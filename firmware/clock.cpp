@@ -313,6 +313,20 @@ void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool so
   int hour2 = hour;
   int minute2 = minute;
 
+  //Checks if duplicate marked for deletion exists, if so unmark delete
+  for(int i=0;i<preferences.alarmTimes.size();i++) {
+    if(preferences.alarmTimes.at(i).at(0) == hour && preferences.alarmTimes.at(i).at(1) == minute) {
+      if(preferences.alarmTimes.at(i).at(7) == false) {
+        return;
+      } else if(preferences.alarmTimes.at(i).at(3) == isOnce && preferences.alarmTimes.at(i).at(4) == light &&
+          preferences.alarmTimes.at(i).at(5) == sound && preferences.alarmTimes.at(i).at(6) == dayOfWeek) {
+        preferences.alarmTimes.at(i).at(7) = true;
+        updateAlarmString();
+        return;
+      }
+    }
+  }
+
   //set a LightAlarm to go off 30 minutes early if light is enabled
   if(light) {
     minute2 -= 30;
