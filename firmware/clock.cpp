@@ -11,6 +11,7 @@
 bool isDST(int dayOfMonth, int month, int dayOfWeek, String rule);
 void refreshDisplayTime();
 void addAlarms();
+void updateAlarmString();
 void markDelete(int hour, int minute);
 int checkDelete(AlarmID_t ID);
 int deleteAlarm(String command);
@@ -34,6 +35,7 @@ int maxBrightness;
 int DSTJumpHour; //When DST takes effect
 int driverCurrent = 1000; //Driver current output (in mA)
 double temp;
+String alarmString;
 bool alarm = false;
 bool light = false;
 
@@ -88,6 +90,7 @@ void setup() {
   Spark.function("CreateAlarm", createAlarm);
   Spark.function("DeleteAlarm", deleteAlarm);
   Spark.variable("Temperature", &temp, DOUBLE);
+  Spark.variable("alarmString", &alarmString, STRING);
 }
 
 void loop() {
@@ -203,11 +206,42 @@ void addAlarms() {
   }
 }
 
+//Updates alarmString so alarms can be read via cloud
+//hh.mm.ss.b.b.b.d (b = 1/0) (d = - or 1,2,3,4,5,6,7)
+void updateAlarmString() {
+  alarmString = "";
+  for(int i=0;i<preferences.alarmTimes.size();i++) {
+    if(preferences.alarmTimes.at(i).at(7) == true) {
+      continue;
+    }
+    String temp = "";
+    temp += preferences.alarmTimes.at(i).at(0);
+    temp += ".";
+    temp += preferences.alarmTimes.at(i).at(1);
+    temp += ".";
+    temp += preferences.alarmTimes.at(i).at(2);
+    temp += ".";
+    temp += preferences.alarmTimes.at(i).at(3);
+    temp += ".";
+    temp += preferences.alarmTimes.at(i).at(4);
+    temp += ".";
+    temp += preferences.alarmTimes.at(i).at(5);
+    temp += ".";
+    if(preferences.alarmTimes.at(i).at(6) == -1) {
+      temp += "-";
+    } else {
+      temp += preferences.alarmTimes.at(i).at(6);
+    }
+    alarmString += temp;
+  }
+}
+
 //Mark an alarm for deletion
 void markDelete(int day, int hour, int minute) {
   for(int i=0;i<preferences.alarmTimes.size();i++) {
     if(preferences.alarmTimes.at(i).at(6) == day && preferences.alarmTimes.at(i).at(0) == hour && preferences.alarmTimes.at(i).at(1) == minute) {
-      preferences.alarmTimes.at(i).at(7) = true;
+        preferences.alarmTimes.at(i).at(7) = true;
+      updateAlarmString();
     }
   }
 }
@@ -226,7 +260,8 @@ int checkDelete(AlarmID_t ID) {
       if(preferences.alarmTimes.at(i).at(7) == true) {
         Alarm.free(ID);
         preferences.alarmTimes.erase(preferences.alarmTimes.begin() + i);
-        return 0;
+        updateAlarmString();
+        return -2;
       }
     }
   }
@@ -247,9 +282,9 @@ int deleteAlarm(String command) {
 }
 
 //Creates an alarm from the cloud
-//hh.mm.ss.b.b.b.d (b = 1/0) (d = -1 or 1,2,3,4,5,6,7)
+//hh.mm.ss.b.b.b.d (b = 1/0) (d = - or 1,2,3,4,5,6,7)
 int createAlarm(String command) {
-  if(command.length() != 16 || command.length() != 17) {
+  if(command.length() != 16) {
     return -1;
   }
   int hour = command.substring(0,2).toInt();
@@ -258,7 +293,12 @@ int createAlarm(String command) {
   int isOnce = command.substring(9,10).toInt();
   int light = command.substring(11,12).toInt();
   int sound = command.substring(13,14).toInt();
-  int dayOfWeek = command.substring(15).toInt();
+  int dayOfWeek;
+  if(command.substring(15) == "-") {
+    dayOfWeek = -1;
+  } else {
+    dayOfWeek = command.substring(15).toInt();
+  }
   setAlarm(hour, minute, second, isOnce, light, sound, dayOfWeek);
   return 1;
 }
@@ -352,22 +392,37 @@ void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool so
   temp.push_back(dayOfWeek);
   temp.push_back(false);
   preferences.alarmTimes.push_back(temp);
+  updateAlarmString();
 }
 
 void SoundAlarm() {
-  int alarmIndex = checkDelete(Alarm.getTriggeredAlarmId());
-  if(alarmIndex == 0) {
+  int alarmID = Alarm.getTriggeredAlarmId();
+  int alarmIndex = checkDelete(alarmID);
+  //do nothing if it was just deleted (in checkDelete())
+  if(alarmIndex == -2) {
     return;
   }
   alarm = true;
+  //delete alarm if it is a one time alarm
+  if(preferences.alarmTimes.at(alarmIndex).at(3) == true) {
+    preferences.alarmTimes.at(alarmIndex).at(7) = true;
+    checkDelete(alarmID);
+  }
 }
 
 void LightAlarm() {
-  int alarmIndex = checkDelete(Alarm.getTriggeredAlarmId());
-  if(alarmIndex == 0) {
+  int alarmID = Alarm.getTriggeredAlarmId();
+  int alarmIndex = checkDelete(alarmID);
+  //do nothing if it was just deleted (in checkDelete())
+  if(alarmIndex == -2) {
     return;
   }
   lightFadeIn(preferences.alarmTimes.at(alarmIndex).at(0), preferences.alarmTimes.at(alarmIndex).at(1));
+  //delete alarm if it is a one time alarm
+  if(preferences.alarmTimes.at(alarmIndex).at(3) == true) {
+    preferences.alarmTimes.at(alarmIndex).at(7) = true;
+    checkDelete(alarmID);
+  }
 }
 
 //Start light fade in to a given time
