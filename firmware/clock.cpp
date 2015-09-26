@@ -327,7 +327,7 @@ void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool so
     }
   }
 
-  //set a LightAlarm to go off 30 minutes early if light is enabled
+  //Get the time a LightAlarm would go off (30 minutes early if light is enabled)
   if(light) {
     minute2 -= 30;
     if(minute2 < 0) {
@@ -342,6 +342,7 @@ void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool so
       }
     }
 
+    //Check if there is enough time and handle accordingly
     bool enoughTime = true;
     currentMinute -= 30;
     if(currentMinute < 0) {
@@ -360,15 +361,15 @@ void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool so
     }
 
     if(!enoughTime) {
-
+      lightFadeIn(hour, minute);
     }
     if(isOnce) {
-      if(!enoughTime) {
-        markDelete(dayOfWeek, hour, minute);
-      } else if(dayOfWeek != -1) {
-        Alarm.alarmOnce(day2, hour2, minute2, second, LightAlarm);
-      } else {
-        Alarm.alarmOnce(hour2, minute2, second, LightAlarm);
+      if(enoughTime) {
+        if(dayOfWeek != -1) {
+          Alarm.alarmOnce(day2, hour2, minute2, second, LightAlarm);
+        } else {
+          Alarm.alarmOnce(hour2, minute2, second, LightAlarm);
+        }
       }
     } else {
       if(dayOfWeek != -1) {
@@ -410,6 +411,7 @@ void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool so
 }
 
 void SoundAlarm() {
+  //TODO: Check/Debug if this can even run - one time alarm may have already been cleared/deleted by now
   int alarmID = Alarm.getTriggeredAlarmId();
   int alarmIndex = checkDelete(alarmID);
   //do nothing if it was just deleted (in checkDelete())
@@ -417,14 +419,15 @@ void SoundAlarm() {
     return;
   }
   alarm = true;
-  //delete alarm if it is a one time alarm
+  //delete alarm from the vector if it is a one time alarm
   if(preferences.alarmTimes.at(alarmIndex).at(3) == true) {
-    preferences.alarmTimes.at(alarmIndex).at(7) = true;
-    checkDelete(alarmID);
+    preferences.alarmTimes.erase(preferences.alarmTimes.begin() + alarmIndex);
+    updateAlarmString();
   }
 }
 
 void LightAlarm() {
+  //TODO: Check/Debug if this can even run - one time alarm may have already been cleared/deleted by now
   int alarmID = Alarm.getTriggeredAlarmId();
   int alarmIndex = checkDelete(alarmID);
   //do nothing if it was just deleted (in checkDelete())
@@ -432,10 +435,10 @@ void LightAlarm() {
     return;
   }
   lightFadeIn(preferences.alarmTimes.at(alarmIndex).at(0), preferences.alarmTimes.at(alarmIndex).at(1));
-  //delete alarm if it is a one time alarm
+  //delete alarm from the vector if it is a one time alarm
   if(preferences.alarmTimes.at(alarmIndex).at(3) == true) {
-    preferences.alarmTimes.at(alarmIndex).at(7) = true;
-    checkDelete(alarmID);
+    preferences.alarmTimes.erase(preferences.alarmTimes.begin() + alarmIndex);
+    updateAlarmString();
   }
 }
 
