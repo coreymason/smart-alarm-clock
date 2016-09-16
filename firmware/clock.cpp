@@ -8,8 +8,11 @@
 #undef swap()
 #include <vector>
 
-bool isDST(int dayOfMonth, int month, int dayOfWeek, String rule);
+enum DSTRule {DST_US, DST_EU, DST_OFF};
+
+bool isDST(int dayOfMonth, int month, int dayOfWeek, DSTRule rule);
 void refreshDisplayTime();
+void updatePreferences();
 void addAlarms();
 void updateAlarmString();
 void markDelete(int hour, int minute);
@@ -36,42 +39,81 @@ int DSTJumpHour; //When DST takes effect
 int driverCurrent = 1000; //Driver current output (in mA)
 double temp;
 String alarmString;
-bool alarm = false;
-bool light = false;
+String testString;
+bool soundAlarm = false;
+bool lightAlarm = false;
+std::vector<std::vector<int>> vectorAlarmTimes;
 
 struct Preferences {
+  int version;
   int timeZone; //UTC time zone offset
   int hourFormat; //12 or 24
   int piezoHertz; //Piezo alarm frequency
   int LEDCurrent; //LED current rating (in mA)
-  int ledBrightness; //Maximum brightness (0 to 100%)
-  String DSTRule; //US, EU, or OFF
-  std::vector<std::vector<int>> alarmTimes; // {hour, minute, second, isOnce, light, sound, dayOfWeek, del}
-} preferences;
+  int LEDBrightness; //Maximum brightness (0 to 100%)
+  DSTRule dstRule; //US, EU, or OFF
+  int alarmTimes[32][8]; //{hour, minute, second, isOnce, light, sound, dayOfWeek, del}
+};
+
+Preferences preferences;
 
 int piezoPin = A4;
 int LEDPin = A7;
 
 void setup() {
-  if(EEPROM.read(0) == 117) {
-    EEPROM.get(1, preferences);
-  } else {
-    std::vector<std::vector<int>> alarmTimes;
-    preferences = {-8, 12, 2000, .7, 100, "US", alarmTimes};
-    EEPROM.put(1, preferences);
-    EEPROM.put(0, 117);
+  //EEPROM.clear();
+  testString = "zo345566";
+  EEPROM.get(0, preferences);
+  testString += "get";
+  if(preferences.version != 0) {
+    preferences.version = 0;
+    preferences.timeZone = -8;
+    preferences.hourFormat = 12;
+    preferences.piezoHertz = 2000;
+    preferences.LEDCurrent = 700;
+    preferences.LEDBrightness = 100;
+    preferences.dstRule = DST_US;
+    for(int i=0;i<32;++i) {
+      preferences.alarmTimes[i][0] = -1;
+    }
+    EEPROM.put(0, preferences);
+    testString += "put";
   }
 
-  if(preferences.DSTRule == "US") {
+  //Converts preferences.alarmTimes to vectorAlarmTimes
+  for(int i=0;i<32;++i) {
+    if(preferences.alarmTimes[i][0] != -1) {
+      std::vector<int> temp;
+      temp.push_back(preferences.alarmTimes[i][0]);
+      temp.push_back(preferences.alarmTimes[i][1]);
+      temp.push_back(preferences.alarmTimes[i][2]);
+      temp.push_back(preferences.alarmTimes[i][3]);
+      temp.push_back(preferences.alarmTimes[i][4]);
+      temp.push_back(preferences.alarmTimes[i][5]);
+      temp.push_back(preferences.alarmTimes[i][6]);
+      temp.push_back(preferences.alarmTimes[i][7]);
+      vectorAlarmTimes.push_back(temp);
+    }
+  }
+
+  testString += preferences.timeZone;
+  testString += preferences.hourFormat;
+  testString += preferences.piezoHertz;
+  testString += preferences.LEDCurrent;
+  testString += preferences.LEDBrightness;
+  testString += preferences.dstRule;
+
+  if(preferences.dstRule == DST_US) {
     DSTJumpHour = 2;
-  } else if(preferences.DSTRule == "EU") {
+  } else if(preferences.dstRule == DST_EU) {
     DSTJumpHour = 1 + preferences.timeZone;
   } else {
     DSTJumpHour = 0;
   }
 
   //Set the proper time zone according to DST status
-  Time.zone(isDST(Time.day(), Time.month(), Time.weekday(), preferences.DSTRule) ? preferences.timeZone + 1 : preferences.timeZone);
+  Time.zone(isDST(Time.day(), Time.month(), Time.weekday(), preferences.dstRule) ? preferences.timeZone + 1 : preferences.timeZone);
+  //testString += isDST(Time.day(), Time.month(), Time.weekday(), preferences.dstRule);
 
   //Setup the 7-segment display, temperature sensor, and audio amp
   display.begin(0x70);
@@ -87,24 +129,25 @@ void setup() {
   addAlarms();
 
   //Cloud functions and variables
-  Spark.function("CreateAlarm", createAlarm);
-  Spark.function("DeleteAlarm", deleteAlarm);
-  Spark.variable("Temperature", &temp, DOUBLE);
-  Spark.variable("alarmString", &alarmString, STRING);
+  Particle.function("CreateAlarm", createAlarm);
+  Particle.function("DeleteAlarm", deleteAlarm);
+  Particle.variable("Temperature", temp);
+  Particle.variable("alarmString", alarmString);
+  Particle.variable("testString", testString);
 }
 
 void loop() {
   unsigned long currentTime = Time.now();
 
-  //Request time synchronization from the Spark Cloud every 24 hours
+  //Request time synchronization from the Particle Cloud every 24 hours
   if (millis() - lastSync > ONE_DAY_MILLIS) {
-    Spark.syncTime();
+    Particle.syncTime();
     lastSync = millis();
   }
 
   //Update time zone at DSTJumpHour incase DST is now in effect
   if(Time.hour(currentTime) == DSTJumpHour && Time.minute(currentTime) == 0) {
-    Time.zone(isDST(Time.day(currentTime), Time.month(currentTime), Time.weekday(currentTime), preferences.DSTRule) ? preferences.timeZone + 1 : preferences.timeZone);
+    Time.zone(isDST(Time.day(currentTime), Time.month(currentTime), Time.weekday(currentTime), preferences.dstRule) ? preferences.timeZone + 1 : preferences.timeZone);
   }
 
   //Update the 7-segment display
@@ -115,9 +158,14 @@ void loop() {
     temp = tempSensor.getTemperature();
     //TODO: Send and/or record data
   }
+  //Testing
+  if(Time.minute(currentTime) % 1) {
+    temp = tempSensor.getTemperature();
+    //TODO: Send and/or record data
+  }
 
   //Sound alarm check
-  if(alarm) {
+  if(soundAlarm) {
     if(millis() - lastBeep > 600) {
       lastBeep = millis();
       tone(piezoPin, preferences.piezoHertz, 300);
@@ -125,7 +173,7 @@ void loop() {
   }
 
   //Light alarm check
-  if(light) {
+  if(lightAlarm) {
     analogWrite(LEDPin, min(maxBrightness, ((currentTime - lightS) / (lightF - lightS)) * maxBrightness));
   }
 
@@ -134,8 +182,8 @@ void loop() {
 }
 
 //Return true if DST is currently observed
-bool isDST(int dayOfMonth, int month, int dayOfWeek, String rule) {
-  if(rule == "US") {
+bool isDST(int dayOfMonth, int month, int dayOfWeek, DSTRule rule) {
+  if(rule == DST_US) {
     //Month quick check
     if (month < 3 || month > 11) {
       return false;
@@ -150,7 +198,7 @@ bool isDST(int dayOfMonth, int month, int dayOfWeek, String rule) {
     } else {
       return previousSunday <= 0;
     }
-  } else if(rule == "EU") {
+  } else if(rule == DST_EU) {
     //Month quick check
     if (month < 3 || month > 10) {
       return false;
@@ -198,11 +246,28 @@ void refreshDisplayTime() {
   display.writeDisplay();
 }
 
+//Update the alarmTimes array in preferences with vectorAlarmTimes
+void updatePreferences() {
+  for(int i=0;i<32;++i) {
+    for(int j=0;j<8;++j) {
+      if(i < vectorAlarmTimes.size()) {
+        preferences.alarmTimes[i][j] = vectorAlarmTimes.at(i).at(j);
+      } else {
+        if(j == 0) {
+          preferences.alarmTimes[i][j] = -1;
+        } else {
+          preferences.alarmTimes[i][j] = 0;
+        }
+      }
+    }
+  }
+}
+
 //Add alarms from eeprom
 void addAlarms() {
-  for(int i=0;i<preferences.alarmTimes.size();i++) {
-    setAlarm(preferences.alarmTimes.at(i).at(0), preferences.alarmTimes.at(i).at(1), preferences.alarmTimes.at(i).at(2),
-      preferences.alarmTimes.at(i).at(3), preferences.alarmTimes.at(i).at(4), preferences.alarmTimes.at(i).at(5), preferences.alarmTimes.at(i).at(6));
+  for(int i=0;i<vectorAlarmTimes.size();++i) {
+    setAlarm(vectorAlarmTimes.at(i).at(0), vectorAlarmTimes.at(i).at(1), vectorAlarmTimes.at(i).at(2),
+      vectorAlarmTimes.at(i).at(3), vectorAlarmTimes.at(i).at(4), vectorAlarmTimes.at(i).at(5), vectorAlarmTimes.at(i).at(6));
   }
 }
 
@@ -210,27 +275,27 @@ void addAlarms() {
 //hh.mm.ss.b.b.b.d (b = 1/0) (d = - or 1,2,3,4,5,6,7)
 void updateAlarmString() {
   alarmString = "";
-  for(int i=0;i<preferences.alarmTimes.size();i++) {
-    if(preferences.alarmTimes.at(i).at(7) == true) {
+  for(int i=0;i<vectorAlarmTimes.size();++i) {
+    if(vectorAlarmTimes.at(i).at(7) == true) {
       continue;
     }
     String temp = "";
-    temp += preferences.alarmTimes.at(i).at(0);
+    temp += vectorAlarmTimes.at(i).at(0);
     temp += ".";
-    temp += preferences.alarmTimes.at(i).at(1);
+    temp += vectorAlarmTimes.at(i).at(1);
     temp += ".";
-    temp += preferences.alarmTimes.at(i).at(2);
+    temp += vectorAlarmTimes.at(i).at(2);
     temp += ".";
-    temp += preferences.alarmTimes.at(i).at(3);
+    temp += vectorAlarmTimes.at(i).at(3);
     temp += ".";
-    temp += preferences.alarmTimes.at(i).at(4);
+    temp += vectorAlarmTimes.at(i).at(4);
     temp += ".";
-    temp += preferences.alarmTimes.at(i).at(5);
+    temp += vectorAlarmTimes.at(i).at(5);
     temp += ".";
-    if(preferences.alarmTimes.at(i).at(6) == -1) {
+    if(vectorAlarmTimes.at(i).at(6) == -1) {
       temp += "-";
     } else {
-      temp += preferences.alarmTimes.at(i).at(6);
+      temp += vectorAlarmTimes.at(i).at(6);
     }
     alarmString += temp;
   }
@@ -238,28 +303,30 @@ void updateAlarmString() {
 
 //Mark an alarm for deletion
 void markDelete(int day, int hour, int minute) {
-  for(int i=0;i<preferences.alarmTimes.size();i++) {
-    if(preferences.alarmTimes.at(i).at(6) == day && preferences.alarmTimes.at(i).at(0) == hour && preferences.alarmTimes.at(i).at(1) == minute) {
-        preferences.alarmTimes.at(i).at(7) = true;
+  for(int i=0;i<vectorAlarmTimes.size();++i) {
+    if(vectorAlarmTimes.at(i).at(6) == day && vectorAlarmTimes.at(i).at(0) == hour && vectorAlarmTimes.at(i).at(1) == minute) {
+      vectorAlarmTimes.at(i).at(7) = true;
+      updatePreferences();
       updateAlarmString();
     }
   }
 }
 
-//Check if marked, if so delete the alarm from eeprom and TimeAlarms
-//Returns 0 if deleted, -1 if not found, or the vector index
+//Check if marked, if so delete the alarm from eeprom and alarmTimes
+//Returns 0 if deleted, -1 if not found, or the array index
 int checkDelete(AlarmID_t ID) {
   unsigned long currentTime = Time.now();
   int hour = Time.hour(currentTime);
   int minute = Time.minute(currentTime);
   int alarmIndex = -1;
 
-  for(int i=0;i<preferences.alarmTimes.size();i++) {
-    if(preferences.alarmTimes.at(i).at(0) == hour && preferences.alarmTimes.at(i).at(1) == minute) {
+  for(int i=0;i<vectorAlarmTimes.size();++i) {
+    if(vectorAlarmTimes.at(i).at(0) == hour && vectorAlarmTimes.at(i).at(1) == minute) {
       alarmIndex = i;
-      if(preferences.alarmTimes.at(i).at(7) == true) {
+      if(vectorAlarmTimes.at(i).at(7)== true) {
         Alarm.free(ID);
-        preferences.alarmTimes.erase(preferences.alarmTimes.begin() + i);
+        vectorAlarmTimes.erase(vectorAlarmTimes.begin() + i);
+        updatePreferences();
         updateAlarmString();
         return -2;
       }
@@ -303,6 +370,7 @@ int createAlarm(String command) {
   return 1;
 }
 
+//TODO: Make sure no larger than array size 32
 //Set an alarm according to the given parameters
 void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool sound, int dayOfWeek) {
   unsigned long currentTime = Time.now();
@@ -314,13 +382,13 @@ void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool so
   int minute2 = minute;
 
   //Checks if duplicate marked for deletion exists, if so unmark delete
-  for(int i=0;i<preferences.alarmTimes.size();i++) {
-    if(preferences.alarmTimes.at(i).at(0) == hour && preferences.alarmTimes.at(i).at(1) == minute) {
-      if(preferences.alarmTimes.at(i).at(7) == false) {
+  for(int i=0;i<vectorAlarmTimes.size();++i) {
+    if(vectorAlarmTimes.at(i).at(0) == hour && vectorAlarmTimes.at(i).at(1) == minute) {
+      if(vectorAlarmTimes.at(i).at(7) == false) {
         return;
-      } else if(preferences.alarmTimes.at(i).at(3) == isOnce && preferences.alarmTimes.at(i).at(4) == light &&
-          preferences.alarmTimes.at(i).at(5) == sound && preferences.alarmTimes.at(i).at(6) == dayOfWeek) {
-        preferences.alarmTimes.at(i).at(7) = true;
+      } else if(vectorAlarmTimes.at(i).at(3) == isOnce && vectorAlarmTimes.at(i).at(4) == light &&
+          vectorAlarmTimes.at(i).at(5) == sound && vectorAlarmTimes.at(i).at(6) == dayOfWeek) {
+        vectorAlarmTimes.at(i).at(7) = true;
         updateAlarmString();
         return;
       }
@@ -406,7 +474,8 @@ void setAlarm(int hour, int minute, int second, bool isOnce, bool light, bool so
   temp.push_back(sound);
   temp.push_back(dayOfWeek);
   temp.push_back(false);
-  preferences.alarmTimes.push_back(temp);
+  vectorAlarmTimes.push_back(temp);
+  updatePreferences();
   updateAlarmString();
 }
 
@@ -418,10 +487,11 @@ void SoundAlarm() {
   if(alarmIndex == -2) {
     return;
   }
-  alarm = true;
-  //delete alarm from the vector if it is a one time alarm
-  if(preferences.alarmTimes.at(alarmIndex).at(3) == true) {
-    preferences.alarmTimes.erase(preferences.alarmTimes.begin() + alarmIndex);
+  soundAlarm = true;
+  //delete alarm from the array if it is a one time alarm
+  if(vectorAlarmTimes.at(alarmIndex).at(3) == true) {
+    vectorAlarmTimes.erase(vectorAlarmTimes.begin() + alarmIndex);
+    updatePreferences();
     updateAlarmString();
   }
 }
@@ -434,10 +504,11 @@ void LightAlarm() {
   if(alarmIndex == -2) {
     return;
   }
-  lightFadeIn(preferences.alarmTimes.at(alarmIndex).at(0), preferences.alarmTimes.at(alarmIndex).at(1));
-  //delete alarm from the vector if it is a one time alarm
-  if(preferences.alarmTimes.at(alarmIndex).at(3) == true) {
-    preferences.alarmTimes.erase(preferences.alarmTimes.begin() + alarmIndex);
+  lightFadeIn(vectorAlarmTimes.at(alarmIndex).at(0), vectorAlarmTimes.at(alarmIndex).at(1));
+  //delete alarm from the array if it is a one time alarm
+  if(vectorAlarmTimes.at(alarmIndex).at(3) == true) {
+    vectorAlarmTimes.erase(vectorAlarmTimes.begin() + alarmIndex);
+    updatePreferences();
     updateAlarmString();
   }
 }
@@ -450,12 +521,12 @@ void lightFadeIn(int hour, int minute) {
     difference += 24*60;
   }
   lightF = lightS + difference*60;
-  maxBrightness = 4095*(preferences.LEDCurrent/driverCurrent)*(preferences.ledBrightness/100);
-  light = true;
+  maxBrightness = 4095*(preferences.LEDCurrent/driverCurrent)*(preferences.LEDBrightness/100);
+  lightAlarm = true;
 }
 
 //Turn off all active alarms
 void alarmOff() {
-  alarm = false;
-  light = false;
+  soundAlarm = false;
+  lightAlarm = false;
 }
