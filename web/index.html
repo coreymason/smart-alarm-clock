@@ -47,6 +47,36 @@
       </footer>
     </div> <!-- /container -->
 
+    <div id="devices-modal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="devices-modal" aria-hidden="true">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title" id="gridModalLabel">Select the clock from your devices</h4>
+          </div>
+          <div class="modal-body">
+            <div class="container-fluid" id="devices">
+              <!--<div class="row">
+                <div class="col-md-8 text-truncate">Name Trunc</div>
+                <div class="col-md-4">Online</div>
+              </div>
+              <div class="row">
+                <div class="col-md-12">
+                  <small class="text-muted">ID:1019192034043234245</small>
+                </div>
+              </div>
+              <hr>-->
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary">Go!</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
     <div class="container-fluid animated fadeInLeft">
       <div class="row vertical-align">
         <div class="col-xs-6 col-md-3 mx-auto login-form">
@@ -60,7 +90,7 @@
               </div>
             </div>
             <div class="col-xs-10 push-xs-1 form-group">
-              <input class="form-control" type="email" id="email" placeholder="Email"/>
+              <input class="form-control" type="email" id="email" placeholder="Email" autofocus/>
             </div>
             <div class="col-xs-10 push-xs-1 form-group">
               <input class="form-control" type="password" id="password" placeholder="Password"/>
@@ -76,7 +106,7 @@
               <button class="btn btn-primary btn-block" type="submit">Login</button>
             </div>
             <div class="col-xs-8 push-xs-2 form-group">
-              <p class="text-muted">Alternatively, you may login with an access key <a href="#">here</a></p>
+              <p class="text-muted">Alternatively, you may login with an access key <a href="javascript:void(0)">here</a></p>
             </div>
           </form>
           <form class="row" id="key-form">
@@ -97,7 +127,7 @@
               <button class="btn btn-primary btn-block" type="submit">Login</button>
             </div>
             <div class="col-xs-8 push-xs-2 form-group">
-              <p class="text-muted">Alternatively, you may login with your Particle account <a href="#">here</a></p>
+              <p class="text-muted">Alternatively, you may login with your Particle account <a href="javascript:void(0)">here</a></p>
             </div>
           </form>
         </div>
