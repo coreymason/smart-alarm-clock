@@ -1,12 +1,40 @@
 var particle = new Particle();
 var token;
+var deviceID;
 
-$('.login-form a').click(function(){
+$(document).ready(function() {
+  $(document).on('click', '#device', function() {
+    if($(this).hasClass("device-clicked")) {
+      $(this).toggleClass("device-clicked");
+    } else {
+      $("div").removeClass( "device-clicked" )
+      $(this).addClass("device-clicked");
+    }
+  });
+  $("#device-selected").click(function() {
+    $('.alert-device-selection').hide(50);
+    $('.alert-device-status').hide(50);
+    if ($(".device-clicked")[0]){
+      console.log("Status", $(".device-clicked #status").text());
+      if($(".device-clicked #status").text() == "Online") {
+        deviceID = $(".device-clicked #device-ID").text();
+        //Continue to dashboard
+      } else {
+        $('.alert-device-status').show(100);
+      }
+    } else {
+      $('.alert-device-selection').show(100);
+    }
+  });
+});
+
+
+$(".login-form a").click(function(){
   //Toggle form
   $('form').animate({height: "toggle", opacity: "toggle"}, "slow");
 });
 
-$( "#particle-form" ).submit(function(event) {
+$("#particle-form").submit(function(event) {
   //Prevent refresh
   event.preventDefault();
   //process form and login with account
@@ -35,7 +63,7 @@ $( "#particle-form" ).submit(function(event) {
   );
 });
 
-$( "#key-form" ).submit(function(event) {
+$("#key-form").submit(function(event) {
   //Prevent refresh
   event.preventDefault();
   //process form and login with account
@@ -70,9 +98,10 @@ function selectDevice() {
           content += '<hr>';
         }
 
-        content += '<div class="row"><div class="col-md-8 text-truncate">' + device.name +
-            '</div><div class="col-md-4">' + connected + '</div></div><div class="row">' +
-            '<div class="col-md-12"><small class="text-muted">ID: ' + device.id + '</small></div></div>';
+        content += '<div id="device"><div class="row"><div class="col-md-8 text-truncate">' + device.name +
+            '</div><div class="col-md-4" id="status">' + connected + '</div></div><div class="row">' +
+            '<div class="col-md-12"><small class="text-muted">ID: </small><small class="text-muted" ' +
+            'id="device-ID">' + device.id + '</small></div></div></div>';
         $("#devices").append(content);
         i++;
       });

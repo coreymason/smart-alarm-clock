@@ -55,22 +55,28 @@
             <h4 class="modal-title" id="gridModalLabel">Select the clock from your devices</h4>
           </div>
           <div class="modal-body">
-            <div class="container-fluid" id="devices">
-              <!--<div class="row">
-                <div class="col-md-8 text-truncate">Name Trunc</div>
-                <div class="col-md-4">Online</div>
-              </div>
+            <div class="container-fluid">
               <div class="row">
-                <div class="col-md-12">
-                  <small class="text-muted">ID:1019192034043234245</small>
+                <div class="col-xs-12 alert-device-selection">
+                  <div class="alert alert-warning" role="alert">
+                    <strong>Oh no!</strong> Please select a device first.
+                  </div>
                 </div>
               </div>
-              <hr>-->
+              <div class="row">
+                <div class="col-xs-12 alert-device-status">
+                  <div class="alert alert-danger" role="alert">
+                    <strong>Oh no!</strong> This device is offline, please select another or refresh.
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="container-fluid" id="devices">
             </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-            <button type="button" class="btn btn-primary">Go!</button>
+            <button type="button" class="btn btn-primary" id="device-selected">Go!</button>
           </div>
         </div>
       </div>
@@ -79,7 +85,7 @@
 
     <div class="container-fluid animated fadeInLeft">
       <div class="row vertical-align">
-        <div class="col-xs-6 col-md-3 mx-auto login-form">
+        <div class="col-xs-6 col-xl-3 mx-auto login-form">
           <form class="row" id="particle-form">
             <div class="col-xs-10 push-xs-1 form-group">
               <h2>Particle Account Login</h2>

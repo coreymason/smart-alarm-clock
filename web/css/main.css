@@ -34,8 +34,17 @@ body {
   padding-top: 2rem;
 }
 
-.alert-particle-login {
+
+.alert-particle-login, .alert-device-selection, .alert-device-status {
   display: none;
+}
+
+#device:hover {
+  background: #fcf8e3;
+}
+
+.device-clicked {
+  background: #dff0d8 !important;
 }
 
 #key-form {
