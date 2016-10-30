@@ -15,10 +15,12 @@ $(document).ready(function() {
     $('.alert-device-selection').hide(50);
     $('.alert-device-status').hide(50);
     if ($(".device-clicked")[0]){
-      console.log("Status", $(".device-clicked #status").text());
+      //console.log("Status", $(".device-clicked #status").text());
       if($(".device-clicked #status").text() == "Online") {
         deviceID = $(".device-clicked #device-ID").text();
         //Continue to dashboard
+        $('#devices-modal').modal('hide');
+        $('.main-section').animate({height: "toggle", opacity: "toggle"}, "slow");
       } else {
         $('.alert-device-status').show(100);
       }

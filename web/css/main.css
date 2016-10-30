@@ -27,13 +27,16 @@ body {
   align-items: center;
 }
 
-.login-form {
+.login-form, .box {
   float:none;
   background: #FFFFFF;
   box-shadow: 0 0 20px 0 rgba(0, 0, 0, 0.2), 0 5px 5px 0 rgba(0, 0, 0, 0.24);
   padding-top: 2rem;
 }
 
+.box:first-of-type {
+  padding-top: 1rem;
+}
 
 .alert-particle-login, .alert-device-selection, .alert-device-status {
   display: none;
@@ -53,4 +56,5 @@ body {
 
 #dashboard {
   display: none;
+  padding-top: 4rem;
 }
